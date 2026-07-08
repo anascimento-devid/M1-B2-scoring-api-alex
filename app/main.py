@@ -34,7 +34,6 @@ logger.add(
     level="INFO",
 )
 
-
 # --- Lifespan ---------------------------------------------------------------
 
 MODELS_DIR = Path(__file__).parent.parent / "models"
@@ -86,11 +85,23 @@ async def health() -> HealthResponse:
 async def info() -> dict:
     """Return loaded model metadata.
 
-    TODO — Return at least: api_version, model_name, model_version,
-    model_created_at, metrics_holdout.
+    TODO — Return at least: api_version, model_name, model_version, model_created_at, metrics_holdout.
     """
     # TODO — Implement (cf. mini-cours 05_Versionning_modele_essentiel.md)
-    raise NotImplementedError("Implement /info endpoint")
+    if not hasattr(app.state, "metadata") or app.state.metadata is None:
+        raise HTTPException(status_code=503, detail="Metadata not loaded")
+
+    metadata = app.state.metadata
+
+    return {
+        "api_version": app.version,
+        "model_name": metadata.get("model_name"),
+        "model_version": metadata.get("model_version"),
+        "model_created_at": metadata.get("created_at"),
+        "sklearn_version": metadata.get("sklearn_version"),
+        "dataset_sha256": metadata.get("dataset_sha256"),
+        "metrics_holdout": metadata.get("metrics_holdout"),
+    }
 
 
 @app.post("/predict", response_model=Prediction, status_code=status.HTTP_200_OK)
@@ -103,4 +114,23 @@ async def predict(application: LoanApplication, request: Request) -> Prediction:
       3. Return Prediction with request_id from request.state
     """
     # TODO — Implement (cf. mini-cours 01_FastAPI_Pydantic_ml_essentiel.md)
-    raise NotImplementedError("Implement /predict endpoint")
+    if not hasattr(app.state, "model") or app.state.model is None:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+
+    if not hasattr(app.state, "metadata") or app.state.metadata is None:
+        raise HTTPException(status_code=503, detail="Metadata not loaded")
+
+    model = app.state.model
+    metadata = app.state.metadata
+
+    df = pd.DataFrame([application.model_dump()])
+
+    prediction = model.predict(df)[0]
+    proba = model.predict_proba(df)[0][1]
+
+    return Prediction(
+        prediction=int(prediction),
+        probability=float(proba),
+        model_version=metadata.get("model_version"),
+        request_id=request.state.request_id,
+    )
