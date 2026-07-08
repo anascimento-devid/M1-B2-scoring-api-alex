@@ -21,9 +21,10 @@ from app.schemas import HealthResponse, LoanApplication, Prediction
 
 LOGS_DIR = Path(__file__).parent.parent / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 logger.remove()
-logger.add(sys.stderr, level="INFO", colorize=True)
+logger.add(sys.stderr, level=LOG_LEVEL, colorize=True)
 logger.add(
     LOGS_DIR / "api.log",
     rotation="10 MB",
